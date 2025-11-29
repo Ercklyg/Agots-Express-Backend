@@ -1,6 +1,6 @@
 import pool from "../config/db.js";
 
-// Dashboard stats with comparisons
+// ------------------------- DASHBOARD STATS -------------------------
 export const getDashboardStats = async (req, res) => {
   try {
     // Total Orders today and yesterday
@@ -35,7 +35,6 @@ export const getDashboardStats = async (req, res) => {
       "SELECT IFNULL(AVG(rating),0) AS avg FROM feedback WHERE WEEK(created_at,1) = WEEK(DATE_SUB(CURDATE(), INTERVAL 1 WEEK),1)"
     );
 
-    // Always return numeric values
     res.status(200).json({
       totalOrders: Number(ordersToday[0].total || 0),
       totalOrdersPrevious: Number(ordersYesterday[0].total || 0),
@@ -43,12 +42,8 @@ export const getDashboardStats = async (req, res) => {
       totalCustomersPrevious: Number(customersLastWeek[0].total || 0),
       todayRevenue: Number(revenueToday[0].total || 0),
       revenuePrevious: Number(revenueYesterday[0].total || 0),
-      averageFeedback: Number(
-        parseFloat(feedbackThisWeek[0].avg || 0).toFixed(1)
-      ),
-      feedbackPrevious: Number(
-        parseFloat(feedbackLastWeek[0].avg || 0).toFixed(1)
-      ),
+      averageFeedback: Number(parseFloat(feedbackThisWeek[0].avg || 0).toFixed(1)),
+      feedbackPrevious: Number(parseFloat(feedbackLastWeek[0].avg || 0).toFixed(1)),
     });
   } catch (err) {
     console.error(err);
@@ -56,7 +51,7 @@ export const getDashboardStats = async (req, res) => {
   }
 };
 
-// Recent Orders
+// ------------------------- RECENT ORDERS -------------------------
 export const getRecentOrders = async (req, res) => {
   try {
     const [rows] = await pool.query(`
@@ -67,7 +62,6 @@ export const getRecentOrders = async (req, res) => {
       LIMIT 10
     `);
 
-    // Ensure numeric total_amount
     const formattedRows = rows.map((r) => ({
       ...r,
       total_amount: Number(r.total_amount || 0),
@@ -80,72 +74,7 @@ export const getRecentOrders = async (req, res) => {
   }
 };
 
-// Orders by hour chart
-export const getOrdersByHour = async (req, res) => {
-  try {
-    const [rows] = await pool.query(`
-      SELECT HOUR(created_at) AS hour, COUNT(*) AS orders
-      FROM orders
-      WHERE DATE(created_at) = CURDATE()
-      GROUP BY HOUR(created_at)
-      ORDER BY hour
-    `);
-
-    const hours = Array.from({ length: 13 }, (_, i) => 8 + i); // 8AM-8PM
-    const data = hours.map((h) => rows.find((r) => r.hour === h)?.orders || 0);
-    const labels = hours.map(
-      (h) => `${h > 12 ? h - 12 : h}${h >= 12 ? "PM" : "AM"}`
-    );
-
-    res.status(200).json({ labels, data });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to fetch orders by hour" });
-  }
-};
-
-// Weekly sales chart
-export const getSalesByDay = async (req, res) => {
-  try {
-    const [rows] = await pool.query(`
-      SELECT DAYNAME(created_at) AS day, IFNULL(SUM(total_amount),0) AS sales
-      FROM orders
-      WHERE WEEK(created_at, 1) = WEEK(CURDATE(), 1)
-        AND status = 'completed'
-      GROUP BY DAYNAME(created_at)
-    `);
-
-    const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const data = weekDays.map(
-      (day) => rows.find((r) => r.day.startsWith(day))?.sales || 0
-    );
-
-    res.status(200).json({ labels: weekDays, data });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to fetch sales by week" });
-  }
-};
-
-// Fetch items for a specific order
-export const getOrderItems = async (req, res) => {
-  const { orderId } = req.params;
-  try {
-    const [rows] = await pool.query(
-      `SELECT food_name, quantity, price, total
-       FROM order_items
-       WHERE order_id = ?`,
-      [orderId]
-    );
-
-    res.status(200).json(rows);
-  } catch (err) {
-    console.error("Failed to fetch order items:", err);
-    res.status(500).json({ message: "Failed to fetch order items" });
-  }
-};
-
-// Fetch all orders
+// ------------------------- ALL ORDERS -------------------------
 export const getAllOrders = async (req, res) => {
   try {
     const [rows] = await pool.query(`
@@ -164,5 +93,103 @@ export const getAllOrders = async (req, res) => {
   } catch (err) {
     console.error("Failed to fetch all orders:", err);
     res.status(500).json({ message: "Failed to fetch all orders" });
+  }
+};
+
+// ------------------------- ORDERS BY HOUR -------------------------
+export const getOrdersByHour = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT HOUR(created_at) AS hour, COUNT(*) AS orders
+      FROM orders
+      WHERE DATE(created_at) = CURDATE()
+      GROUP BY HOUR(created_at)
+      ORDER BY hour
+    `);
+
+    const hours = Array.from({ length: 13 }, (_, i) => 8 + i); // 8AM-8PM
+    const data = hours.map((h) => rows.find((r) => r.hour === h)?.orders || 0);
+    const labels = hours.map((h) => `${h > 12 ? h - 12 : h}${h >= 12 ? "PM" : "AM"}`);
+
+    res.status(200).json({ labels, data });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch orders by hour" });
+  }
+};
+
+// ------------------------- SALES WEEKLY -------------------------
+export const getSalesByDay = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT DAYNAME(created_at) AS day, IFNULL(SUM(total_amount),0) AS sales
+      FROM orders
+      WHERE WEEK(created_at, 1) = WEEK(CURDATE(), 1)
+        AND status = 'completed'
+      GROUP BY DAYNAME(created_at)
+    `);
+
+    const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const data = weekDays.map((day) => rows.find((r) => r.day.startsWith(day))?.sales || 0);
+
+    res.status(200).json({ labels: weekDays, data });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch sales by week" });
+  }
+};
+
+// ------------------------- ORDER ITEMS -------------------------
+export const getOrderItems = async (req, res) => {
+  const { orderId } = req.params;
+  try {
+    const [rows] = await pool.query(
+      `SELECT m.name AS food_name, oi.quantity, oi.price, oi.total
+       FROM order_items oi
+       JOIN menu m ON m.id = oi.menu_id
+       WHERE oi.order_id = ?`,
+      [orderId]
+    );
+
+    res.status(200).json(rows);
+  } catch (err) {
+    console.error("Failed to fetch order items:", err);
+    res.status(500).json({ message: "Failed to fetch order items" });
+  }
+};
+
+// ------------------------- CUSTOMERS -------------------------
+export const getAllCustomers = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT id, first_name, email, phone, password, address, created_at 
+      FROM users 
+      WHERE role = 'customer'
+      ORDER BY created_at DESC
+    `);
+
+    res.status(200).json(rows);
+  } catch (err) {
+    console.error("Failed to fetch customers:", err);
+    res.status(500).json({ message: "Failed to fetch customers" });
+  }
+};
+
+export const updateCustomer = async (req, res) => {
+  const { id } = req.params;
+  const { first_name, email, phone, password, address } = req.body;
+
+  try {
+    await pool.query(
+      `UPDATE users 
+       SET first_name = ?, email = ?, phone = ?, password = ?, address = ? 
+       WHERE id = ?`,
+      [first_name, email, phone, password, address, id]
+    );
+
+    res.status(200).json({ message: "Customer updated successfully" });
+  } catch (err) {
+    console.error("Failed to update customer:", err);
+    res.status(500).json({ message: "Failed to update customer" });
   }
 };
