@@ -5,17 +5,23 @@ import jwt from "jsonwebtoken";
 import validator from "validator";
 
 // TABLE: users
-// id | username | password | role | first_name | email | phone | created_at
+// id | username | password | role | first_name | email | phone | address | created_at
 
 /* ---------------------- REGISTER USER ---------------------- */
-export const registerUser = async (username, password, role, first_name, email, phone) => {
+export const registerUser = async (
+  username,
+  password,
+  role,
+  first_name,
+  email,
+  phone,
+  address
+) => {
   if (!username || !password || !role)
     throw new Error("Username, Password and Role are required");
 
-  // optional fields for customer (others can be NULL)
-  if (email && !validator.isEmail(email)) {
-    throw new Error("Invalid email format");
-  }
+  // Optional validation
+  if (email && !validator.isEmail(email)) throw new Error("Invalid email format");
 
   if (
     !validator.isStrongPassword(password, {
@@ -24,22 +30,32 @@ export const registerUser = async (username, password, role, first_name, email, 
       minSymbols: 1,
     })
   ) {
-    throw new Error("Weak password. Must include 8 chars, 1 number, 1 symbol.");
+    throw new Error(
+      "Weak password. Must include 8 chars, 1 number, 1 symbol."
+    );
   }
 
   const hashedPassword = bcrypt.hashSync(password, 10);
 
   const [result] = await pool.query(
-    `INSERT INTO users (username, password, role, first_name, email, phone)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [username, hashedPassword, role, first_name, email, phone]
+    `INSERT INTO users (username, password, role, first_name, email, phone, address)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [username, hashedPassword, role, first_name, email, phone, address]
   );
 
-  return { id: result.insertId };
+  return {
+    id: result.insertId,
+    username,
+    role,
+    first_name,
+    email,
+    phone,
+    address,
+  };
 };
 
 /* ---------------------- LOGIN USER ---------------------- */
-export const loginUser = async (username, password) => {
+export const loginUser = async (username) => {
   const [rows] = await pool.query(
     "SELECT * FROM users WHERE username = ? LIMIT 1",
     [username]
@@ -48,21 +64,13 @@ export const loginUser = async (username, password) => {
   const user = rows[0];
   if (!user) throw new Error("User not found");
 
-  const isMatch = bcrypt.compareSync(password, user.password);
-  if (!isMatch) throw new Error("Incorrect password");
+  // Password comparison will be handled in controller
+  return user;
+};
 
-  const token = jwt.sign(
-    { id: user.id, role: user.role },
-    process.env.SECRET,
-    { expiresIn: "1d" }
-  );
-
-  return {
-    token,
-    id: user.id,
-    role: user.role,
-    username: user.username,
-  };
+/* ---------------------- GENERATE JWT ---------------------- */
+export const generateToken = (payload) => {
+  return jwt.sign(payload, process.env.SECRET, { expiresIn: "1d" });
 };
 
 /* ---------------------- GET USER BY ID ---------------------- */
@@ -73,6 +81,28 @@ export const getUserById = async (id) => {
 
 /* ---------------------- GET ALL USERS ---------------------- */
 export const getAllUsers = async () => {
-  const [rows] = await pool.query("SELECT * FROM users ORDER BY id DESC");
+  const [rows] = await pool.query(
+    "SELECT id, username, role, first_name, email, phone, address, created_at FROM users ORDER BY id DESC"
+  );
   return rows;
+};
+
+/* ---------------------- UPDATE USER ---------------------- */
+export const updateUser = async (id, data) => {
+  const { first_name, email, phone, address, password } = data;
+
+  // If password is updated, hash it
+  let hashedPassword = null;
+  if (password) hashedPassword = bcrypt.hashSync(password, 10);
+
+  const [result] = await pool.query(
+    `UPDATE users 
+     SET first_name = ?, email = ?, phone = ?, address = ?, ${hashedPassword ? "password = ?" : ""} 
+     WHERE id = ?`,
+    hashedPassword
+      ? [first_name, email, phone, address, hashedPassword, id]
+      : [first_name, email, phone, address, id]
+  );
+
+  return result.affectedRows > 0;
 };
