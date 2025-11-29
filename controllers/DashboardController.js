@@ -126,3 +126,43 @@ export const getSalesByDay = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch sales by week" });
   }
 };
+
+// Fetch items for a specific order
+export const getOrderItems = async (req, res) => {
+  const { orderId } = req.params;
+  try {
+    const [rows] = await pool.query(
+      `SELECT food_name, quantity, price, total
+       FROM order_items
+       WHERE order_id = ?`,
+      [orderId]
+    );
+
+    res.status(200).json(rows);
+  } catch (err) {
+    console.error("Failed to fetch order items:", err);
+    res.status(500).json({ message: "Failed to fetch order items" });
+  }
+};
+
+// Fetch all orders
+export const getAllOrders = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT o.id, u.first_name AS customer_name, o.total_amount, o.status, o.created_at
+      FROM orders o
+      JOIN users u ON u.id = o.customer_id
+      ORDER BY o.created_at DESC
+    `);
+
+    const formattedRows = rows.map((r) => ({
+      ...r,
+      total_amount: Number(r.total_amount || 0),
+    }));
+
+    res.status(200).json(formattedRows);
+  } catch (err) {
+    console.error("Failed to fetch all orders:", err);
+    res.status(500).json({ message: "Failed to fetch all orders" });
+  }
+};
