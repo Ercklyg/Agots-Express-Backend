@@ -1,6 +1,6 @@
 import pool from "../config/db.js";
 
-// Get all feedback with customer info and single optional response
+// Get all feedback with customer info and optional response
 export const getAllFeedback = async () => {
   try {
     const [rows] = await pool.query(`
@@ -29,6 +29,20 @@ export const getAllFeedback = async () => {
   }
 };
 
+// Get average rating (SQL) for consistency
+export const getAverageRating = async () => {
+  try {
+    const [[row]] = await pool.query(`
+      SELECT COALESCE(AVG(rating),0) AS avg_rating
+      FROM feedback
+    `);
+    return row;
+  } catch (err) {
+    console.error("Error fetching average rating:", err.message);
+    throw err;
+  }
+};
+
 // Add or update a feedback response
 export const addOrUpdateFeedbackResponse = async (
   feedback_id,
@@ -42,26 +56,18 @@ export const addOrUpdateFeedbackResponse = async (
   }
 
   try {
-    // Check if a response already exists for this feedback
     const [existing] = await pool.query(
       `SELECT id FROM feedback_responses WHERE feedback_id = ?`,
       [feedback_id]
     );
 
     if (existing.length > 0) {
-      // Update existing response
       await pool.query(
         `UPDATE feedback_responses SET responder_id = ?, response = ?, created_at = NOW() WHERE feedback_id = ?`,
         [responder_id, response, feedback_id]
       );
-      return {
-        feedback_id,
-        responder_id,
-        response,
-        updated: true,
-      };
+      return { feedback_id, responder_id, response, updated: true };
     } else {
-      // Insert new response
       const [result] = await pool.query(
         `INSERT INTO feedback_responses (feedback_id, responder_id, response) VALUES (?, ?, ?)`,
         [feedback_id, responder_id, response]

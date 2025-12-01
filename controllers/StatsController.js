@@ -1,7 +1,9 @@
 import pool from "../config/db.js";
 import { getDashboardStats } from "../models/StatsModel.js";
 
-// ------------------------- DASHBOARD STATS -------------------------
+/**
+ * GET /dashboard/stats
+ */
 export const getStats = async (req, res) => {
   try {
     const stats = await getDashboardStats();
@@ -12,8 +14,8 @@ export const getStats = async (req, res) => {
       totalOrders: 0,
       totalOrdersPrevious: 0,
       totalCustomers: 0,
-      currentWeekCustomers: 0,
-      previousWeekCustomers: 0,
+      todayCustomers: 0,
+      yesterdayCustomers: 0,
       customerPercentage: 0,
       todayRevenue: 0,
       revenuePrevious: 0,
@@ -60,59 +62,5 @@ export const getOrderItems = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to fetch order items" });
-  }
-};
-
-// ------------------------- CUSTOMERS -------------------------
-export const getAllCustomers = async (req, res) => {
-  try {
-    const [rows] = await pool.query(`
-      SELECT id, first_name, email, phone, password, address, created_at
-      FROM users
-      WHERE role='customer'
-      ORDER BY created_at DESC
-    `);
-    res.status(200).json(rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to fetch customers" });
-  }
-};
-
-export const updateCustomer = async (req, res) => {
-  const { id } = req.params;
-  const { first_name, email, phone, password, address } = req.body;
-  try {
-    await pool.query(
-      `UPDATE users 
-       SET first_name=?, email=?, phone=?, password=?, address=? 
-       WHERE id=?`,
-      [first_name, email, phone, password, address, id]
-    );
-    res.status(200).json({ message: "Customer updated successfully" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to update customer" });
-  }
-};
-
-// ------------------------- SALES BY DAY -------------------------
-export const getSalesByDay = async (req, res) => {
-  try {
-    const [rows] = await pool.query(`
-      SELECT DAYNAME(created_at) AS day, IFNULL(SUM(total_amount),0) AS sales
-      FROM orders
-      WHERE WEEK(created_at,1) = WEEK(CURDATE(),1)
-        AND status='completed'
-      GROUP BY DAYNAME(created_at)
-    `);
-    const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const data = weekDays.map(
-      (day) => rows.find((r) => r.day.startsWith(day))?.sales || 0
-    );
-    res.status(200).json({ labels: weekDays, data });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to fetch sales by week" });
   }
 };
