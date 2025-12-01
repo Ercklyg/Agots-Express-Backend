@@ -1,4 +1,3 @@
-// routers/UsersRoutes.js
 import express from "express";
 import * as UsersController from "../controllers/UserControllers.js";
 
