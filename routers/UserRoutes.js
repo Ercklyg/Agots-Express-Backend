@@ -8,4 +8,6 @@ UsersRoutes.get("/all", UsersController.getAll);
 UsersRoutes.post("/register", UsersController.register);
 UsersRoutes.post("/login", UsersController.login);
 
+
+
 export default UsersRoutes;
