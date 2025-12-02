@@ -6,7 +6,8 @@ export const addMenuItem = async (
   category,
   price,
   description,
-  group
+  group,
+  image
 ) => {
   if (!name || !price || !description || !group) {
     throw new Error("Name, price, description, and group are required fields");
@@ -14,8 +15,15 @@ export const addMenuItem = async (
 
   try {
     const [result] = await pool.query(
-      "INSERT INTO menu (name, category, price, description, `group`) VALUES (?, ?, ?, ?, ?)",
-      [name, category === "None" ? null : category, price, description, group]
+      "INSERT INTO menu (name, category, price, description, `group`, image) VALUES (?, ?, ?, ?, ?, ?)",
+      [
+        name,
+        category === "None" ? null : category,
+        price,
+        description,
+        group,
+        image || null,
+      ]
     );
 
     return {
@@ -25,6 +33,7 @@ export const addMenuItem = async (
       price,
       description,
       group,
+      image: image || null,
     };
   } catch (err) {
     console.error("Error inserting menu item:", err.message);
@@ -34,7 +43,7 @@ export const addMenuItem = async (
 
 // Update menu item
 export const updateMenuItem = async (id, data) => {
-  const { name, category, price, description, group } = data;
+  const { name, category, price, description, group, image } = data;
   if (!name || !price || !description || !group) {
     throw new Error("Name, price, description, and group are required fields");
   }
@@ -42,8 +51,8 @@ export const updateMenuItem = async (id, data) => {
   try {
     const updatedCategory = category === "None" ? null : category;
     const [result] = await pool.query(
-      "UPDATE menu SET name = ?, category = ?, price = ?, description = ?, `group` = ? WHERE id = ?",
-      [name, updatedCategory, price, description, group, id]
+      "UPDATE menu SET name = ?, category = ?, price = ?, description = ?, `group` = ?, image = ? WHERE id = ?",
+      [name, updatedCategory, price, description, group, image || null, id]
     );
     return result.affectedRows > 0;
   } catch (err) {

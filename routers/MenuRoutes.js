@@ -1,20 +1,34 @@
-
 import express from "express";
+import multer from "multer";
+import path from "path";
 import {
   createMenuItem,
+  updateMenuItem,
   deleteMenuItem,
   getAllMenuItems,
   getMenuItemById,
-  updateMenuItem,
 } from "../controllers/MenuController.js";
 
 const router = express.Router();
 
-// Routes for managing menu items
-router.post("/menu", createMenuItem); // Create a new menu item
-router.get("/menu", getAllMenuItems); // Get all menu items
-router.get("/menu/:id", getMenuItemById); // Get a single menu item by ID
-router.put("/menu/:id", updateMenuItem); // Update a menu item by ID
-router.delete("/menu/:id", deleteMenuItem); // Delete a menu item by ID
+// Multer storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/menu/");
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({ storage });
+
+// Routes
+router.post("/menu", upload.single("image"), createMenuItem);
+router.put("/menu/:id", upload.single("image"), updateMenuItem);
+router.get("/menu", getAllMenuItems);
+router.get("/menu/:id", getMenuItemById);
+router.delete("/menu/:id", deleteMenuItem);
 
 export default router;

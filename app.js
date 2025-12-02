@@ -8,6 +8,7 @@ import menuRoutes from "./routers/MenuRoutes.js"; // Import menu routes
 import StatsRoutes from "./routers/StatsRoutes.js";
 import UsersRoutes from "./routers/UserRoutes.js";
 import AnalyticsRoutes from "./routers/AnalyticsRoutes.js";
+import path from "path";
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use(express.json());
 
 app.use("/users", UsersRoutes);
 app.use("/api/feedback", feedbackRoutes);
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/stats", StatsRoutes);
 app.use("/dashboard", DashboardRoutes);
 app.use("/api/announcements", announcementsRoutes);

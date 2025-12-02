@@ -1,20 +1,22 @@
+import fs from "fs";
+import path from "path";
 import * as MenuModel from "../models/MenuModel.js";
 
 // Create menu item
 export const createMenuItem = async (req, res) => {
   const { name, category, price, description, group } = req.body;
+  const image = req.file ? req.file.filename : null;
+
   try {
     const newItem = await MenuModel.addMenuItem(
       name,
       category,
       price,
       description,
-      group
+      group,
+      image
     );
-    res.status(201).json({
-      ...newItem,
-      category: newItem.category || "None",
-    });
+    res.status(201).json({ ...newItem, category: newItem.category || "None" });
   } catch (err) {
     res
       .status(500)
@@ -25,27 +27,48 @@ export const createMenuItem = async (req, res) => {
 // Update menu item
 export const updateMenuItem = async (req, res) => {
   const { id } = req.params;
-  const { name, category, price, description, group } = req.body;
+  const { name, category, price, description, group, existingImage } = req.body;
+
   try {
+    // Fetch the current menu item
+    const currentItem = await MenuModel.getMenuItemById(id);
+    if (!currentItem)
+      return res.status(404).json({ message: "Menu item not found" });
+
+    // Determine the image to use
+    let imageToUse = currentItem.image; // default: keep current image
+    if (req.file) {
+      // If new file uploaded, replace it
+      imageToUse = req.file.filename;
+
+      // Delete old image from disk if exists
+      if (currentItem.image) {
+        const oldImagePath = path.join("uploads/menu", currentItem.image);
+        fs.unlink(oldImagePath, (err) => {
+          if (err) console.error("Failed to delete old image:", err.message);
+        });
+      }
+    }
+
+    // Update the menu item
     const updated = await MenuModel.updateMenuItem(id, {
       name,
       category,
       price,
       description,
       group,
+      image: imageToUse,
     });
-    if (!updated)
-      return res.status(404).json({ message: "Menu item not found" });
-    res
-      .status(200)
-      .json({
-        id,
-        name,
-        category: category || "None",
-        price,
-        description,
-        group,
-      });
+
+    res.status(200).json({
+      id,
+      name,
+      category: category || "None",
+      price,
+      description,
+      group,
+      image: imageToUse,
+    });
   } catch (err) {
     res
       .status(500)
@@ -57,9 +80,19 @@ export const updateMenuItem = async (req, res) => {
 export const deleteMenuItem = async (req, res) => {
   const { id } = req.params;
   try {
+    // Fetch the item to get its image
+    const item = await MenuModel.getMenuItemById(id);
+    if (!item) return res.status(404).json({ message: "Menu item not found" });
+
+    // Delete the image file if exists
+    if (item.image) {
+      const imagePath = path.join("uploads/menu", item.image);
+      fs.unlink(imagePath, (err) => {
+        if (err) console.error("Failed to delete image:", err.message);
+      });
+    }
+
     const deleted = await MenuModel.deleteMenuItem(id);
-    if (!deleted)
-      return res.status(404).json({ message: "Menu item not found" });
     res.status(200).json({ message: "Menu item deleted successfully" });
   } catch (err) {
     res
