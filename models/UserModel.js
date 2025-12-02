@@ -17,8 +17,17 @@ export const registerUser = async (
     throw new Error("Username, Password and Role are required");
 
   // Optional email validation
-  if (email && !validator.isEmail(email))
-    throw new Error("Invalid email format");
+  if (email) {
+    if (!validator.isEmail(email)) {
+      throw new Error("Invalid email format");
+    }
+
+    // Stricter Gmail validation using regex
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
+    if (!gmailRegex.test(email)) {
+      throw new Error("Email must be a valid Gmail address (example@gmail.com)");
+    }
+  }
 
   // Password strength validation
   if (
@@ -50,6 +59,7 @@ export const registerUser = async (
     address,
   };
 };
+
 
 // ---------------------- LOGIN USER ----------------------
 export const loginUser = async (username) => {
