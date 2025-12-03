@@ -17,6 +17,7 @@ import UsersRoutes from "./routers/UserRoutes.js";
 import customerRoutes from "./routers/CustomerRoutes.js";
 import StaffRoutes from "./routers/StaffRoutes.js";
 import cartRoutes from "./routers/CartRoutes.js";
+import orderRoutes from "./routers/OrderRoutes.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -56,6 +57,7 @@ app.use("/landing", landingRoutes);
 app.use("/customer", customerRoutes);
 app.use("/staff", StaffRoutes); // Staff endpoints
 app.use("/api/cart", cartRoutes);
+app.use("/api/orders", orderRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;

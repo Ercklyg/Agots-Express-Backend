@@ -1,15 +1,16 @@
 import pool from "../config/db.js";
 
-// Place a new order
-export const placeOrder = async (req, res) => {
-  const {
-    customer_id,
-    items, // Array of { menu_id, quantity, price }
-    paymentMethod,
-    deliveryAddress, // { first_name, last_name, phone, email, address, delivery_instructions, latitude, longitude }
-  } = req.body;
+export const placeOrderController = async (req, res) => {
+  const { user_id, paymentMethod, deliveryAddress, items } = req.body;
 
-  if (!customer_id || !items || !items.length || !deliveryAddress) {
+  // Validate required fields
+  if (
+    !user_id ||
+    !deliveryAddress?.first_name ||
+    !deliveryAddress?.last_name ||
+    !deliveryAddress?.phone ||
+    !deliveryAddress?.address
+  ) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
@@ -18,67 +19,83 @@ export const placeOrder = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Calculate total amount
-    let totalAmount = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
-    if (paymentMethod === "cash") totalAmount += 50; // Add delivery fee if cash
+    // 1️⃣ Fetch cart items if items not sent from frontend
+    let orderItems = items;
+    if (!orderItems || !orderItems.length) {
+      const [cartItems] = await connection.query(
+        `SELECT c.menu_id, c.quantity, m.price
+         FROM carts c
+         JOIN menu m ON c.menu_id = m.id
+         WHERE c.user_id = ?`,
+        [user_id]
+      );
 
-    // Insert into orders
-    const [orderResult] = await connection.query(
-      "INSERT INTO orders (customer_id, total_amount, status) VALUES (?, ?, 'pending')",
-      [customer_id, totalAmount]
+      if (!cartItems.length) throw new Error("Cart is empty");
+      orderItems = cartItems.map((i) => ({
+        menu_id: i.menu_id,
+        quantity: i.quantity,
+        price: i.price,
+      }));
+    }
+
+    // Calculate total
+    const totalAmount = orderItems.reduce(
+      (sum, i) => sum + i.price * i.quantity,
+      0
     );
 
-    const orderId = orderResult.insertId;
+    // 2️⃣ Insert into orders
+    const [orderResult] = await connection.query(
+      `INSERT INTO orders (customer_id, total_amount, payment_method, status) 
+       VALUES (?, ?, ?, 'pending')`,
+      [user_id, totalAmount, paymentMethod]
+    );
 
-    // Insert order items
-    for (const item of items) {
-      const itemTotal = item.price * item.quantity;
+    const order_id = orderResult.insertId;
+
+    // 3️⃣ Insert into order_items
+    for (const item of orderItems) {
       await connection.query(
-        "INSERT INTO order_items (order_id, menu_id, quantity, price, total) VALUES (?, ?, ?, ?, ?)",
-        [orderId, item.menu_id, item.quantity, item.price, itemTotal]
+        `INSERT INTO order_items (order_id, menu_id, quantity, price, total) 
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          order_id,
+          item.menu_id,
+          item.quantity,
+          item.price,
+          item.price * item.quantity,
+        ]
       );
     }
 
-    // Insert delivery address
-    const {
-      first_name,
-      last_name,
-      phone,
-      email,
-      address,
-      delivery_instructions,
-      latitude,
-      longitude,
-    } = deliveryAddress;
-
+    // 4️⃣ Insert into delivery_info
     await connection.query(
-      `INSERT INTO delivery_address 
-      (order_id, first_name, last_name, phone, email, address, delivery_instructions, latitude, longitude)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO delivery_info 
+        (order_id, first_name, last_name, phone, email, address, delivery_instructions) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
-        orderId,
-        first_name,
-        last_name,
-        phone,
-        email || null,
-        address,
-        delivery_instructions || null,
-        latitude,
-        longitude,
+        order_id,
+        deliveryAddress.first_name,
+        deliveryAddress.last_name,
+        deliveryAddress.phone,
+        deliveryAddress.email || null,
+        deliveryAddress.address,
+        deliveryAddress.delivery_instructions || null,
       ]
     );
 
-    await connection.commit();
+    // 5️⃣ Clear user's cart
+    await connection.query(`DELETE FROM carts WHERE user_id = ?`, [user_id]);
 
-    res.status(201).json({
-      message: "Order placed successfully",
-      order_id: orderId,
-      total_amount: totalAmount,
-    });
+    await connection.commit();
+    res.status(200).json({ order_id });
   } catch (err) {
     await connection.rollback();
-    console.error("Failed to place order:", err.message);
-    res.status(500).json({ message: "Failed to place order", error: err.message });
+    console.error("Place Order Error:", err);
+    res.status(500).json({
+      message: "Failed to place order",
+      error: err.message,
+    });
   } finally {
     connection.release();
   }
