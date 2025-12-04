@@ -15,5 +15,4 @@ router.delete("/remove/:user_id/:menu_id", removeCartItem);
 router.delete("/clear/:user_id", clearCartItems);
 router.put("/update", updateCartItemController);
 
-
 export default router;
