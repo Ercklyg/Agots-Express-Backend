@@ -48,7 +48,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/users", UsersRoutes); // user management
 app.use("/rider", RiderRoutes); // rider endpoints
 app.use("/api/feedback", feedbackRoutes);
-app.use("/stats", StatsRoutes);
+app.use("/dashboard/stats", StatsRoutes);
 app.use("/dashboard", DashboardRoutes);
 app.use("/api/announcements", announcementsRoutes);
 app.use("/analytics", AnalyticsRoutes);

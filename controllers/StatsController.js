@@ -6,7 +6,7 @@ import { getDashboardStats } from "../models/StatsModel.js";
  */
 export const getStats = async (req, res) => {
   try {
-    const stats = await getDashboardStats();
+    const stats = await getDashboardStats(); // <--- calls the new stats function
     res.status(200).json(stats);
   } catch (err) {
     console.error("Error fetching dashboard stats:", err);
